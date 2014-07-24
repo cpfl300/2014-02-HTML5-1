@@ -52,7 +52,6 @@ function completedTODO(e){
 		li.className = "";
 	}
 	// e.target은 이벤트를 실제로 발생시킨 ele, e.currentTarget은 이벤트를 바인딩한 ele
-
 	e.target
 }
 

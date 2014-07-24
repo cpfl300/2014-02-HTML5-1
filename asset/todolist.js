@@ -31,13 +31,13 @@ function addTODO(e){
 		};
 
 		var template = 
-		"<li class=\"{}\"> 
-			<div class=\"view\"> 
-				<input class=\"toggle\" type=\"checkbox\" {}>" +
-				"<label>{{inputData}}</label> 
-				<button class=\"destroy\"></button>
-			</div>
-		</li>";
+		"<li class=\"{}\">" +
+			"<div class=\"view\">" +
+				"<input class=\"toggle\" type=\"checkbox\" {}>" +
+				"<label>{{inputData}}</label>" +
+				"<button class=\"destroy\"></button>"+
+			"</div>" +
+		"</li>";
 
 		var result = Mustache.to_html(template, input);
 		document.querySelector("#todo-list").insertAdjacentHTML('afterBegin', result);

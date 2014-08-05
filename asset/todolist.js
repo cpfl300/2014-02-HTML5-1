@@ -1,6 +1,4 @@
 // Ajax
-// 	- 전체 가져오기
-// 	- 삭제
 
 var TODOSync = {
 	get: function(callback){

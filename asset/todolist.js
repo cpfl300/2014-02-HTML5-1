@@ -1,50 +1,65 @@
-// Ajax
-
 var TODOSync = {
-	get: function(callback){
+	init: function(){
+		window.addEventListener("online", this.onofflineListener);
+		window.addEventListener("offline", this.onofflineListener);
+	},
+	onofflineListener : function(){
+		document.querySelector("#header").classList[navigator.onLine? "remove": "add"]("offline");
+		if(navigator.onLine){
+			// 서버로 싱크 맞추기
+		}
+	},
+	url: "http://ui.nhnnext.org:3333/cpfl300/",
+	xhrBuilder: function(map){
 		var xhr = new XMLHttpRequest();
-		xhr.open("GET", "http://ui.nhnnext.org:3333/cpfl300", true);
+		xhr.open(map.method, map.url, true);
 		xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded;charset=UTF-8");
 		xhr.addEventListener("load", function(e){
-			callback(JSON.parse(xhr.responseText));
+			map.callback(JSON.parse(xhr.responseText));
 		});
-		xhr.send(null);
+		xhr.send(map.send);
+
+	},
+	get: function(callback){
+		this.xhrBuilder({
+			method: "GET", 
+			url: this.url, 
+			callback: callback, 
+			send: null});
 	}, 
 	add: function(todo, callback){
-		var xhr = new XMLHttpRequest();
-		xhr.open("PUT", "http://ui.nhnnext.org:3333/cpfl300", true);
-		xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded;charset=UTF-8");
-		xhr.addEventListener("load", function(e){
-			callback(JSON.parse(xhr.responseText));
-			//DOM추가
-		});
-		xhr.send("todo=" + todo);
+		if(navigator.onLine){
+			this.xhrBuilder({
+				method:"PUT", 
+				url: this.url, 
+				callback: callback, 
+				send: "todo="+todo});
+		} else {
+			// data 클라이언트에 저장 ->  localStorage, indexedDB, websql
+		}
 	},
 	completed: function(param, callback){
-		var xhr = new XMLHttpRequest();
-		xhr.open("POST", "http://ui.nhnnext.org:3333/cpfl300/"+param.key, true);
-		xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded;charset=UTF-8");
-		xhr.addEventListener("load", function(e){
-			callback(JSON.parse(xhr.responseText));
-		});
-		xhr.send("completed=" + param.completed);
+		this.xhrBuilder({
+			method:"POST", 
+			url: this.url+param.key, 
+			callback: callback, 
+			send: "completed=" + param.completed});
 	},
 	remove: function(param, callback){
-		var xhr = new XMLHttpRequest();
-		xhr.open("DELETE", "http://ui.nhnnext.org:3333/cpfl300/"+param.key, true);
-		xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded;charset=UTF-8");
-		xhr.addEventListener("load", function(e){
-			callback(JSON.parse(xhr.responseText));
-		});
-		xhr.send("completed=" + param.completed);
+		this.xhrBuilder({
+			method:"DELETE", 
+			url: this.url+param.key, 
+			callback: callback, 
+			send: null});
 	}
 }
 
 var TODO = {
 	ENTER_KEYCODE: 13,
+	selectedIndex : 0,
 	template :"<li class=\"{{className}}\" data-key=\"{{key}}\">" +
 					"<div class=\"view\">" +
-						"<input class=\"toggle\" type=\"checkbox\">" +
+						"<input class=\"toggle\" type=\"checkbox\" {{isChecked}}>" +
 						"<label>{{todo}}</label>" +
 						"<button class=\"destroy\"></button>"+
 					"</div>" +
@@ -53,25 +68,76 @@ var TODO = {
 		TODOSync.get(function(json){
 			var result;
 			data = {className: ""};
-			for(var i = 0 ; i < json.length; i++){
+			for(var i = json.length-1 ; i >= 0; i--){
 				data.todo = json[i].todo;
 				data.key = json[i].id;
+				data.className = json[i].completed === 0 ? "" : "completed";
+				data.isChecked = data.className === "completed" ? "checked" : "";
+
 				result = Mustache.to_html(TODO.template, data);
-				document.querySelector("#todo-list").insertAdjacentHTML('afterBegin', result);
+				document.querySelector("#todo-list").insertAdjacentHTML('afterBegin', result);				
 			}
 
 		});
 		document.addEventListener("DOMContentLoaded", function(){
 			document.querySelector("#new-todo").addEventListener("keydown", this.addTODO.bind(this));
-			document.querySelector('ul').addEventListener("click", this.liClicked.bind(this));
+			document.querySelector('#todo-list').addEventListener("click", this.liClicked.bind(this));
+			document.querySelector('#filters').addEventListener("click", this.changeStateFilter.bind(this));
+			window.addEventListener("popstate", this.changeURLFilter.bind(this));
 		}.bind(this));
+	},
+	changeURLFilter : function(e){
+		if(e.state){
+			var method = e.state.method;
+			this[method+"View"]();
+		} else {
+			this.allView();
+		}
+	},
+	changeStateFilter : function(e){
+		e.preventDefault();
+
+		var target = e.target;
+		var tagName = target.tagName.toLowerCase();
+		if(tagName == "a"){
+			var href = target.getAttribute("href");
+			if(href === "index.html"){
+				this.allView();
+				history.pushState({"method":"all"}, null, "index.html");
+			} else if(href === "active"){
+				this.activeView();
+				history.pushState({"method":"active"}, null, "active");
+			} else if(href === "completed"){
+				this.completedView();
+				history.pushState({"method":"completed"}, null, "completed");
+			}
+		}
+	},
+	allView : function(){
+		document.querySelector("#todo-list").className = "";
+		this.selectNavigator(0);
+	},
+	activeView : function(){
+		document.querySelector("#todo-list").className = "all-active";
+		this.selectNavigator(1);
+	},
+	completedView : function(){
+		document.querySelector("#todo-list").className = "all-completed";
+		this.selectNavigator(2);
+	},
+	selectNavigator : function(index){
+		var navigatorList = document.querySelectorAll("#filters a");
+		navigatorList[this.selectedIndex].classList.remove("selected");
+		navigatorList[index].classList.add("selected");
+		this.selectedIndex = index;
 	},
 	addTODO: function (e){
 		if(e.keyCode == this.ENTER_KEYCODE){
 
 			var data = {
 				todo: document.querySelector("#new-todo").value,
-				className: "appending"
+				className: "appending",
+				isChecked: ""
 			};
 
 			TODOSync.add(data.todo, function(json){
@@ -140,3 +206,4 @@ var TODO = {
 };
 
 TODO.init();
+TODOSync.init();
